@@ -85,4 +85,49 @@ if user_input := st.chat_input("Ask a question about your data..."):
             columns_info = ", ".join(df.columns)
             prompt = (
                 f"The dataset has these columns: {columns_info}.\n"
-                f"
+                f"Write a single line of Python pandas code (no explanation) using the dataframe 'df' to answer:\n"
+                f"'{user_input}'"
+            )
+
+            # Ask Gemini for pandas code
+            code_response = model.generate_content(prompt)
+            raw_code = code_response.text
+
+            # Extract and clean code
+            code_block = re.findall(r"```(?:python)?\s*(.*?)```", raw_code, re.DOTALL)
+            pandas_code = code_block[0] if code_block else raw_code.strip()
+            lines = pandas_code.splitlines()
+            clean_lines = [
+                line for line in lines
+                if line.strip() and not line.strip().startswith("#")
+            ]
+            pandas_code = "\n".join(clean_lines)
+
+            # Try executing the pandas code
+            try:
+                local_vars = {"df": df.copy()}
+                exec("result = " + pandas_code, {}, local_vars)
+                result = local_vars["result"]
+
+                # Convert result to markdown for AI summary
+                if isinstance(result, pd.DataFrame):
+                    result_text = result.head(5).to_markdown(index=False)
+                else:
+                    result_text = str(result)
+
+                # Business-style summary
+                bot_response = summarize_result_as_analyst(result_text)
+                st.chat_message("assistant", avatar="🤖").markdown(bot_response)
+
+            except Exception as e:
+                bot_response = (
+                    f"⚠️ I encountered an error while processing your request. "
+                    f"Please try rephrasing your question.\n\nError: `{e}`"
+                )
+                st.chat_message("assistant", avatar="🤖").markdown(bot_response)
+
+    except Exception as e:
+        bot_response = f"⚠️ Something went wrong: {e}"
+        st.chat_message("assistant", avatar="🤖").markdown(bot_response)
+
+    st.session_state.chat_history.append(("assistant", bot_response))
