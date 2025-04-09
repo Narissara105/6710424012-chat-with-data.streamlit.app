@@ -7,9 +7,10 @@ st.title("🤖 My Chatbot and Data Analysis App")
 st.subheader("Conversation and Data Analysis")
 
 # Configure Gemini API Key 
-    key = st.secrets['gemini_api_key']
-    genai.configure(api_key=key)
-    model = genai.GenerativeModel('gemini-2.0-flash-lite')
+key = st.secrets['gemini_api_key']
+genai.configure(api_key=key)
+model = genai.GenerativeModel('gemini-2.0-flash-lite')
+
 
 # Initialize session state for storing chat history and data
 if "chat_history" not in st.session_state:
@@ -29,9 +30,7 @@ if uploaded_file is not None:
         # Load the uploaded CSV file
         st.session_state.uploaded_data = pd.read_csv(uploaded_file)
         st.success("File successfully uploaded and read.")
-    except Exception as e:
-        st.error(f"An error occurred while reading the file: {e}")
-
+        
         # Display the content of the CSV
         st.write("### Uploaded Data Preview")
         st.dataframe(st.session_state.uploaded_data.head())
