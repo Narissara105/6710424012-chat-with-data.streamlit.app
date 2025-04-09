@@ -110,8 +110,8 @@ def summarize_as_analyst(answer: str) -> str:
 
 {answer}"""
     response = model.generate_content(summary_prompt)
-    return response.text.strip().split("
-")[0]  # รับเฉพาะบรรทัดแรก
+    return response.text.strip().split("\n")[0]
+  # รับเฉพาะบรรทัดแรก
 
 # -------------------------------
 # รับคำถามจากผู้ใช้ + Fuzzy match
