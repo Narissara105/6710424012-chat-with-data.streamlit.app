@@ -34,7 +34,7 @@ def load_flexible_csv(uploaded_file):
 # -------------------------------
 st.set_page_config(page_title="Chat with Data 🤖", layout="wide")
 st.title("🤖 My Chatbot and Data Analysis App")
-st.subheader("Ask business questions. Get real data-driven answers.")
+st.subheader("Ask your questions. Get real data-driven answers.")
 
 key = st.secrets["gemini_api_key"]
 genai.configure(api_key=key)
