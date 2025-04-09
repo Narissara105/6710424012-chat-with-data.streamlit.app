@@ -34,7 +34,7 @@ def load_flexible_csv(uploaded_file):
 # -------------------------------
 st.set_page_config(page_title="Chat with Data 🤖", layout="wide")
 st.title("🤖 My Chatbot and Data Analysis App")
-st.subheader("อยากรู้อะไรจากไฟล์ ก็ถามมาได้เลยนะ")
+st.subheader("ถามคำถามเชิงธุรกิจ แล้วรับคำตอบจากข้อมูลของคุณ")
 
 key = st.secrets["gemini_api_key"]
 genai.configure(api_key=key)
@@ -55,7 +55,7 @@ if "analyze_data_checkbox" not in st.session_state:
 # -------------------------------
 # อัปโหลดไฟล์
 # -------------------------------
-uploaded_file = st.file_uploader("📁 Upload CSV data for analysis", type=["csv"])
+uploaded_file = st.file_uploader("📁 Upload CSV for analysis", type=["csv"])
 if uploaded_file:
     try:
         df = load_flexible_csv(uploaded_file)
@@ -64,7 +64,6 @@ if uploaded_file:
         st.write("### Uploaded Data Preview")
         st.dataframe(df.head())
 
-        # ✅ Auto-check เมื่อมีไฟล์
         st.session_state.analyze_data_checkbox = True
     except Exception as e:
         st.error(f"❌ Error loading CSV file: {e}")
@@ -81,14 +80,14 @@ if uploaded_dict:
         st.error(f"❌ Failed to load data dictionary: {e}")
 
 # -------------------------------
-# Checkbox วิเคราะห์ด้วย AI (auto check)
+# Checkbox วิเคราะห์ด้วย AI
 # -------------------------------
 analyze_data_checkbox = st.checkbox(
     "Analyze CSV Data with AI", value=st.session_state.analyze_data_checkbox
 )
 
 # -------------------------------
-# ประวัติแชท
+# แสดงแชท
 # -------------------------------
 for role, message in st.session_state.chat_history:
     avatar = "🙂" if role == "user" else "🤖"
@@ -123,12 +122,10 @@ if user_input := st.chat_input("Type your business question about the data..."):
                 data_dict_text = df.dtypes.astype(str).to_string()
                 example_record = df.head(2).to_string(index=False)
 
-                # รวม Data Dictionary ถ้ามี
                 dict_text = ""
                 if st.session_state.uploaded_dictionary is not None:
                     dict_text = "\n\n**Data Dictionary:**\n" + st.session_state.uploaded_dictionary.to_string(index=False)
 
-                # Prompt ให้ AI สร้างโค้ด
                 prompt = f"""
 You are a helpful Python code generator. 
 Your goal is to write Python code snippets based on the user's question and the provided DataFrame information.
@@ -164,10 +161,12 @@ Here's the context:
                 generated_code = match.group(1).strip() if match else raw_code.strip()
 
                 try:
+                    # ✅ เพิ่ม dt = pd.to_datetime
                     local_vars = {
                         df_name: df.copy(),
                         "pd": pd,
-                        "datetime": datetime
+                        "datetime": datetime,
+                        "dt": pd.to_datetime  # ป้องกัน error 'dt is not defined'
                     }
                     exec(generated_code, {}, local_vars)
                     answer = local_vars.get("ANSWER", "No variable named 'ANSWER' was created.")
@@ -178,7 +177,6 @@ Here's the context:
                     else:
                         bot_response = summarize_as_analyst(str(answer))
 
-                    # ✅ แสดงในกล่องพื้นหลังสีเหลืองอ่อน
                     styled_bot_response = f"""
 <div style="background-color:#fff9db; padding: 1rem; border-radius: 0.5rem; border: 1px solid #f1e6b8;">
 {bot_response}
