@@ -34,7 +34,7 @@ def load_flexible_csv(uploaded_file):
 # -------------------------------
 st.set_page_config(page_title="Chat with Data 🤖", layout="wide")
 st.title("🤖 My Chatbot and Data Analysis App")
-st.subheader("Ask business questions. Get real data-driven answers.")
+st.subheader("อยากรู้อะไรจากไฟล์ ก็ถามมาได้เลยนะ")
 
 key = st.secrets["gemini_api_key"]
 genai.configure(api_key=key)
@@ -55,7 +55,7 @@ if "analyze_data_checkbox" not in st.session_state:
 # -------------------------------
 # อัปโหลดไฟล์
 # -------------------------------
-uploaded_file = st.file_uploader("📁 Upload CSV for analysis", type=["csv"])
+uploaded_file = st.file_uploader("📁 Upload CSV data for analysis", type=["csv"])
 if uploaded_file:
     try:
         df = load_flexible_csv(uploaded_file)
@@ -96,16 +96,16 @@ for role, message in st.session_state.chat_history:
         st.markdown(message)
 
 # -------------------------------
-# ฟังก์ชันสรุปแบบนักวิเคราะห์
+# ฟังก์ชันสรุปแบบผู้บริหาร
 # -------------------------------
 def summarize_as_analyst(answer: str) -> str:
     summary_prompt = (
-        "You are a senior business analyst. Please summarize the following result "
-        "in clear and formal business language for decision-makers:\n\n"
+        "You are a senior business analyst speaking to executive leadership. "
+        "Summarize the following result in 1-3 short, clear, high-level sentences:\n\n"
         f"{answer}"
     )
     summary_response = model.generate_content(summary_prompt)
-    return summary_response.text
+    return summary_response.text.strip()
 
 # -------------------------------
 # รับคำถามจากผู้ใช้
@@ -178,7 +178,13 @@ Here's the context:
                     else:
                         bot_response = summarize_as_analyst(str(answer))
 
-                    st.chat_message("assistant", avatar="🤖").markdown(bot_response)
+                    # ✅ แสดงในกล่องพื้นหลังสีเหลืองอ่อน
+                    styled_bot_response = f"""
+<div style="background-color:#fff9db; padding: 1rem; border-radius: 0.5rem; border: 1px solid #f1e6b8;">
+{bot_response}
+</div>
+"""
+                    st.chat_message("assistant", avatar="🤖").markdown(styled_bot_response, unsafe_allow_html=True)
 
                 except Exception as exec_error:
                     bot_response = f"⚠️ I tried to process your question but hit an error:\n`{exec_error}`"
