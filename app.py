@@ -140,11 +140,11 @@ Your job is to write Python code based on the question and DataFrame.
 {dict_text}
 
 **Instructions:**
-- Write Python code using the dataframe `df`
-- Use `exec()` to execute the code
+- Write Python code using the dataframe df
+- Use exec() to execute the code
 - Do NOT import pandas
-- Use `pd.to_datetime()` for dates
-- Save the result in a variable called `ANSWER`
+- Use pd.to_datetime() for dates
+- Save the result in a variable called ANSWER
 - Keep it short, focused, and avoid undefined variables
 """
 
@@ -154,7 +154,7 @@ Your job is to write Python code based on the question and DataFrame.
             generated_code = match.group(1).strip() if match else raw_code.strip()
 
             try:
-                # ✅ รองรับ built-in + ตัวแปรสะกดผิด
+                # ✅ รองรับ built-in + datetime + alias
                 local_vars = {
                     df_name: df.copy(),
                     "pd": pd,
@@ -164,9 +164,13 @@ Your job is to write Python code based on the question and DataFrame.
                     "math": math,
                     "dateparser": dateparser,
                     "__builtins__": __builtins__,
+
+                    # Alias เผื่อ AI ใช้ผิด
                     "datetim": datetime,
                     "dateime": datetime,
                     "dtt": pd.to_datetime,
+                    "datetime_module": datetime,
+                    "datetime_now": datetime.datetime.now,
                 }
 
                 exec(generated_code, {}, local_vars)
@@ -191,11 +195,11 @@ Your job is to write Python code based on the question and DataFrame.
                 st.chat_message("assistant", avatar="🤖").markdown(styled_bot_response, unsafe_allow_html=True)
 
             except NameError as name_err:
-                bot_response = f"⚠️ Variable not defined in code: `{name_err}`. Please rephrase your question or be more specific."
+                bot_response = f"⚠️ Variable not defined in code: {name_err}. Please rephrase your question or be more specific."
                 st.chat_message("assistant", avatar="🤖").markdown(bot_response)
 
             except Exception as exec_error:
-                bot_response = f"⚠️ Code execution error:\n`{exec_error}`"
+                bot_response = f"⚠️ Code execution error:\n{exec_error}"
                 st.chat_message("assistant", avatar="🤖").markdown(bot_response)
 
             st.session_state.chat_history.append(("assistant", bot_response))
