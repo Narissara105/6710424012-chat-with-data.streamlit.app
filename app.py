@@ -123,6 +123,19 @@ if user_input := st.chat_input("พิมพ์คำถามด้านข้
     try:
         if model and st.session_state.uploaded_data is not None and analyze_data_checkbox:
             df = st.session_state.uploaded_data
+            # รวมไฟล์ข้อมูลอื่น ๆ (ถ้ามี)
+            if isinstance(df, list):
+                df = pd.concat(df, ignore_index=True)
+            elif hasattr(st.session_state, "uploaded_extra"):
+                try:
+                    extra_df = st.session_state.uploaded_extra
+                    if isinstance(extra_df, list):
+                        df = pd.concat([df] + extra_df, ignore_index=True)
+                    elif isinstance(extra_df, pd.DataFrame):
+                        df = pd.concat([df, extra_df], ignore_index=True)
+                except:
+                    pass
+            st.session_state.uploaded_data = df
             df_name = "df"
             question = user_input
             data_dict_text = df.dtypes.astype(str).to_string()
@@ -148,7 +161,6 @@ if user_input := st.chat_input("พิมพ์คำถามด้านข้
 - บันทึกผลลัพธ์ในตัวแปรชื่อว่า ANSWER เท่านั้น
 - ถ้าคำถามขออันดับ เช่น 5 อันดับ, ให้ตอบเป็น DataFrame ที่แสดงชื่อ + ค่าที่เกี่ยวข้อง
 - ถ้าคำถามถามยอดรวม ให้ตอบเป็นตัวเลขรวมเดียว 
-- ถ้าถามว่าให้เปรียบเทียบยอดขายเทียบระหว่างเดือน ให้ดูการเพิ่มขึ้นลดลงเท่าไหร่ด้วย
 - ห้าม import pandas หรือ datetime
 - อย่าใช้ตัวแปรที่ไม่ถูกกำหนด
 - เขียนโค้ดให้สั้น ตรงประเด็น และมีความหมายทางธุรกิจชัดเจน
