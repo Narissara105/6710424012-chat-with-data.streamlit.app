@@ -166,6 +166,8 @@ if user_input := st.chat_input("พิมพ์คำถามเกี่ยว
 
             local_vars = {
                 df_name: df.copy(),
+                "df": df,
+                "data": df,
                 "pd": pd,
                 "datetime": datetime,
                 "dt": pd.to_datetime,
