@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-import re
+import numpy as np
 import datetime
+from dateutil import parser as dateparser
+import math
+import re
 
 # -------------------------------
 # ฟังก์ชันโหลด CSV แบบยืดหยุ่น
@@ -27,7 +30,7 @@ def load_flexible_csv(uploaded_file):
                     return df
             except Exception:
                 continue
-    raise ValueError("ไม่สามารถอ่านไฟล์ CSV ได้ โปรดลองใช้ encoding หรือรูปแบบอื่น")
+    raise ValueError("❌ ไม่สามารถอ่านไฟล์ CSV ได้")
 
 # -------------------------------
 # ตั้งค่า Gemini
@@ -63,7 +66,6 @@ if uploaded_file:
         st.success("✅ File successfully uploaded and read.")
         st.write("### Uploaded Data Preview")
         st.dataframe(df.head())
-
         st.session_state.analyze_data_checkbox = True
     except Exception as e:
         st.error(f"❌ Error loading CSV file: {e}")
@@ -99,8 +101,7 @@ for role, message in st.session_state.chat_history:
 # -------------------------------
 def summarize_as_analyst(answer: str) -> str:
     summary_prompt = (
-        "You are a senior business analyst speaking to executive leadership. "
-        "Summarize the following result in 1-3 short, clear, high-level sentences:\n\n"
+        "You are a senior business analyst. Summarize this result in 1-3 short executive-level sentences:\n\n"
         f"{answer}"
     )
     summary_response = model.generate_content(summary_prompt)
@@ -146,13 +147,13 @@ Here's the context:
 
 **Instructions:**
 1. Write Python code that addresses the user's question by querying or manipulating the DataFrame.
-2. **Crucially, use the `exec()` function to execute the generated code.**
+2. Use the `exec()` function to execute your code.
 3. Do not import pandas.
-4. Change any date-like columns to datetime format using `pd.to_datetime()`.
-5. **Store the result in a variable named `ANSWER`.**
-6. Assume the DataFrame is already loaded into a variable called `{df_name}`.
+4. Use `pd.to_datetime()` for any date parsing.
+5. Store your result in a variable named `ANSWER`.
+6. Do not redefine the DataFrame — it's already in `{df_name}`.
 7. Keep the code concise and focused only on answering the question.
-8. If the question asks for a specific output format (e.g., list, value), ensure `ANSWER` reflects that.
+8. If you need datetime or dt or np, assume it's already available.
 """
 
                 code_response = model.generate_content(prompt)
@@ -161,13 +162,16 @@ Here's the context:
                 generated_code = match.group(1).strip() if match else raw_code.strip()
 
                 try:
-                    # ✅ เพิ่ม dt = pd.to_datetime
                     local_vars = {
                         df_name: df.copy(),
                         "pd": pd,
                         "datetime": datetime,
-                        "dt": pd.to_datetime  # ป้องกัน error 'dt is not defined'
+                        "dt": pd.to_datetime,
+                        "dateparser": dateparser,
+                        "np": np,
+                        "math": math,
                     }
+
                     exec(generated_code, {}, local_vars)
                     answer = local_vars.get("ANSWER", "No variable named 'ANSWER' was created.")
 
@@ -185,14 +189,14 @@ Here's the context:
                     st.chat_message("assistant", avatar="🤖").markdown(styled_bot_response, unsafe_allow_html=True)
 
                 except Exception as exec_error:
-                    bot_response = f"⚠️ I tried to process your question but hit an error:\n`{exec_error}`"
+                    bot_response = f"⚠️ Error during code execution:\n`{exec_error}`"
                     st.chat_message("assistant", avatar="🤖").markdown(bot_response)
 
             elif not analyze_data_checkbox:
                 bot_response = "📌 Data analysis is disabled. Please enable the checkbox to allow AI processing."
                 st.chat_message("assistant", avatar="🤖").markdown(bot_response)
             else:
-                bot_response = "📂 Please upload a CSV file first before asking your question."
+                bot_response = "📂 Please upload a CSV file before asking your question."
                 st.chat_message("assistant", avatar="🤖").markdown(bot_response)
 
             st.session_state.chat_history.append(("assistant", bot_response))
