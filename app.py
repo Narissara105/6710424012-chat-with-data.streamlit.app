@@ -98,7 +98,7 @@ for role, message in st.session_state.chat_history:
 # -------------------------------
 def summarize_as_analyst(answer: str) -> str:
     summary_prompt = (
-        "You are a business analyst. Summarize this result for executives with data support.\n\n"
+        "You are a business analyst. Summarize this result for executives level for making decision, make it briefly with significant information.\n\n"
         f"{answer}"
     )
     response = model.generate_content(summary_prompt)
