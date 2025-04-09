@@ -41,7 +41,7 @@ def load_flexible_csv(uploaded_file):
 # -------------------------------
 st.set_page_config(page_title="Chat with Your Data", layout="wide")
 st.title("🤖 My Chatbot and Data Analysis App")
-st.subheader("ถามคำถามเชิงธุรกิจ (ภาษาไทย) แล้วรับคำตอบสั้น กระชับ เหมาะกับผู้บริหาร")
+st.subheader("ถามมาตอบไป กับ Chat with Your Data")
 
 key = st.secrets["gemini_api_key"]
 genai.configure(api_key=key)
