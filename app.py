@@ -101,19 +101,44 @@ for role, message in st.session_state.chat_history:
         st.markdown(message)
 
 # -------------------------------
-# ฟังก์ชันสรุปผลแบบสั้น (ภาษาไทย)
+# รับคำถามจากผู้ใช้
 # -------------------------------
-def summarize_as_analyst(answer: str) -> str:
-    summary_prompt = f"""
+if user_input := st.chat_input("พิมพ์คำถามของคุณที่นี่"):
+    st.chat_message("user", avatar="🙂").markdown(user_input)
+    st.session_state.chat_history.append(("user", user_input))
+
+    try:
+        if model and st.session_state.uploaded_data is not None and analyze_data_checkbox:
+            df = st.session_state.uploaded_data
+            df_name = "df"
+            question = user_input
+            data_dict_text = df.dtypes.astype(str).to_string()
+            example_record = df.head(2).to_string(index=False)
+            dict_text = ""
+            if st.session_state.uploaded_dictionary is not None:
+                dict_text = "\n\n**Data Dictionary:**\n" + st.session_state.uploaded_dictionary.to_string(index=False)
+
+            # ตรวจสอบว่าเคยตอบคำถามนี้หรือคำถามใกล้เคียงแล้วหรือยัง (fuzzy match)
+            if process and st.session_state.qa_memory:
+                similar_question, score, _ = process.extractOne(
+                    question,
+                    list(st.session_state.qa_memory.keys()),
+                    score_cutoff=90
+                )
+                if similar_question:
+                    cached_answer = st.session_state.qa_memory[similar_question]
+                    st.chat_message("assistant", avatar="🤖").markdown(cached_answer, unsafe_allow_html=True)
+                    st.session_state.chat_history.append(("assistant", cached_answer))
+                    raise Exception("✅ คำถามซ้ำ ตอบจาก cache")
+
+            prompt = f"""
 You are a multilingual data analyst assistant who writes Python code to answer user questions based on a pandas DataFrame.
 
 **User Question:** {question}
 
 **DataFrame Name:** {df_name}
-**DataFrame Info:**
-{data_dict_text}
-**Sample Rows:**
-{example_record}
+**DataFrame Info:**\n{data_dict_text}
+**Sample Rows:**\n{example_record}
 {dict_text}
 
 **Instructions:**
@@ -132,19 +157,6 @@ You are a multilingual data analyst assistant who writes Python code to answer u
             raw_code = code_response.text
             match = re.search(r"```python(.*?)```", raw_code, re.DOTALL)
             generated_code = match.group(1).strip() if match else raw_code.strip()
-
-            # ตรวจสอบว่าเคยตอบคำถามนี้หรือคำถามใกล้เคียงแล้วหรือยัง (fuzzy match)
-            if process and st.session_state.qa_memory:
-                similar_question, score, _ = process.extractOne(
-                    question,
-                    list(st.session_state.qa_memory.keys()),
-                    score_cutoff=90
-                )
-                if similar_question:
-                    cached_answer = st.session_state.qa_memory[similar_question]
-                    st.chat_message("assistant", avatar="🤖").markdown(cached_answer, unsafe_allow_html=True)
-                    st.session_state.chat_history.append(("assistant", cached_answer))
-                    raise Exception("✅ คำถามซ้ำ ตอบจาก cache")
 
             local_vars = {
                 df_name: df.copy(),
@@ -171,6 +183,11 @@ You are a multilingual data analyst assistant who writes Python code to answer u
                 answer_text = answer.head(5).to_string(index=False)
             else:
                 answer_text = str(answer)
+
+            def summarize_as_analyst(answer: str) -> str:
+                summary_prompt = f"ตอบคำถามต่อไปนี้แบบสั้น กระชับ และเหมาะกับผู้บริหาร:\n{answer}"
+                response = model.generate_content(summary_prompt)
+                return response.text.strip()
 
             bot_response = summarize_as_analyst(answer_text)
             styled_bot_response = bot_response
