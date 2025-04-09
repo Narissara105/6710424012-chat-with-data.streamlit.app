@@ -106,11 +106,10 @@ Here's the context:
 1. Write Python code that addresses the user's question by querying or manipulating the DataFrame.
 2. **Crucially, use the `exec()` function to execute the generated code.**
 3. Do not import pandas.
-4. Change any date-like columns to datetime format using `pd.to_datetime()`.
-5. **Store the result in a variable named `ANSWER`.**
-6. Assume the DataFrame is already loaded into a variable called `{df_name}`.
-7. Keep the code concise and focused only on answering the question.
-8. If the question asks for a specific output format (e.g., list, value), ensure `ANSWER` reflects that.
+4. **Store the result in a variable named `ANSWER`.**
+5. Assume the DataFrame is already loaded into a variable called `{df_name}`.
+6. Keep the code concise and focused only on answering the question.
+7. If the question asks for a specific output format (e.g., list, value), ensure `ANSWER` reflects that.
 """
 
                 code_response = model.generate_content(prompt)
