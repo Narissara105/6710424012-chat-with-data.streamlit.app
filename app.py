@@ -6,7 +6,11 @@ import datetime
 from dateutil import parser as dateparser
 import math
 import re
-from rapidfuzz import process
+
+try:
+    from rapidfuzz import process
+except ModuleNotFoundError:
+    process = None
 
 # -------------------------------
 # ฟังก์ชันโหลด CSV แบบยืดหยุ่น
@@ -116,7 +120,7 @@ if user_input := st.chat_input("พิมพ์คำถามเกี่ยว
 
     normalized_question = user_input.lower().strip()
 
-    if st.session_state.qa_memory:
+    if process and st.session_state.qa_memory:
         matches = process.extractOne(normalized_question, st.session_state.qa_memory.keys(), score_cutoff=90)
         if matches:
             cached_answer = st.session_state.qa_memory[matches[0]]
