@@ -98,7 +98,7 @@ for role, message in st.session_state.chat_history:
 # -------------------------------
 def summarize_as_analyst(answer: str) -> str:
     summary_prompt = (
-        "You are a business analyst. Summarize this result in 1 short sentence only. "
+        "You are a business analyst. Summarize this result in short sentence with number only . "
         "Avoid explanation. Make it direct and suitable for executives.\n\n"
         f"{answer}"
     )
