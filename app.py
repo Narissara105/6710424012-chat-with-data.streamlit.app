@@ -13,7 +13,6 @@ import re
 def load_flexible_csv(uploaded_file):
     tried_encodings = ["utf-8", "utf-8-sig", "iso-8859-1", "windows-874"]
     delimiters = [",", ";", "\t", "|"]
-    
     for encoding in tried_encodings:
         for sep in delimiters:
             try:
@@ -37,7 +36,7 @@ def load_flexible_csv(uploaded_file):
 # -------------------------------
 st.set_page_config(page_title="Chat with Data 🤖", layout="wide")
 st.title("🤖 My Chatbot and Data Analysis App")
-st.subheader("ถามคำถามจากไฟล์ csv ที่อัพโหลดมาได้เลย")
+st.subheader("ถามคำถามเชิงธุรกิจ แล้วรับคำตอบสั้น กระชับ เหมาะกับผู้บริหาร")
 
 key = st.secrets["gemini_api_key"]
 genai.configure(api_key=key)
@@ -56,19 +55,19 @@ if "analyze_data_checkbox" not in st.session_state:
     st.session_state.analyze_data_checkbox = False
 
 # -------------------------------
-# อัปโหลดไฟล์
+# Upload Files
 # -------------------------------
 uploaded_file = st.file_uploader("📁 Upload CSV for analysis", type=["csv"])
 if uploaded_file:
     try:
         df = load_flexible_csv(uploaded_file)
         st.session_state.uploaded_data = df
-        st.success("✅ File successfully uploaded and read.")
+        st.success("✅ File uploaded successfully.")
         st.write("### Uploaded Data Preview")
         st.dataframe(df.head())
         st.session_state.analyze_data_checkbox = True
     except Exception as e:
-        st.error(f"❌ Error loading CSV file: {e}")
+        st.error(f"❌ Failed to read CSV: {e}")
 
 uploaded_dict = st.file_uploader("📄 Upload Data Dictionary (optional)", type=["csv"])
 if uploaded_dict:
@@ -79,17 +78,15 @@ if uploaded_dict:
         with st.expander("📋 Data Dictionary Preview"):
             st.dataframe(dictionary_df)
     except Exception as e:
-        st.error(f"❌ Failed to load data dictionary: {e}")
+        st.error(f"❌ Failed to read data dictionary: {e}")
 
 # -------------------------------
 # Checkbox วิเคราะห์ด้วย AI
 # -------------------------------
-analyze_data_checkbox = st.checkbox(
-    "Analyze CSV Data with AI", value=st.session_state.analyze_data_checkbox
-)
+analyze_data_checkbox = st.checkbox("Analyze CSV Data with AI", value=st.session_state.analyze_data_checkbox)
 
 # -------------------------------
-# แสดงแชท
+# Show Chat History
 # -------------------------------
 for role, message in st.session_state.chat_history:
     avatar = "🙂" if role == "user" else "🤖"
@@ -97,17 +94,16 @@ for role, message in st.session_state.chat_history:
         st.markdown(message)
 
 # -------------------------------
-# ✅ สรุปแบบผู้บริหาร “สั้นที่สุด”
+# สรุปคำตอบแบบผู้บริหาร (กระชับมาก)
 # -------------------------------
 def summarize_as_analyst(answer: str) -> str:
     summary_prompt = (
-        "You are a senior business analyst. "
-        "Provide the shortest possible executive summary in 1–2 short sentences. "
-        "Avoid explanation. Be direct, insightful, and business-focused.\n\n"
+        "You are a business analyst. Summarize this result in 1 short sentence only. "
+        "Avoid explanation. Make it direct and suitable for executives.\n\n"
         f"{answer}"
     )
-    summary_response = model.generate_content(summary_prompt)
-    return summary_response.text.strip()
+    response = model.generate_content(summary_prompt)
+    return response.text.strip()
 
 # -------------------------------
 # รับคำถามจากผู้ใช้
@@ -117,91 +113,91 @@ if user_input := st.chat_input("Type your business question about the data..."):
     st.session_state.chat_history.append(("user", user_input))
 
     try:
-        if model:
-            if st.session_state.uploaded_data is not None and analyze_data_checkbox:
-                df = st.session_state.uploaded_data
-                df_name = "df"
-                question = user_input
-                data_dict_text = df.dtypes.astype(str).to_string()
-                example_record = df.head(2).to_string(index=False)
+        if model and st.session_state.uploaded_data is not None and analyze_data_checkbox:
+            df = st.session_state.uploaded_data
+            df_name = "df"
+            question = user_input
+            data_dict_text = df.dtypes.astype(str).to_string()
+            example_record = df.head(2).to_string(index=False)
 
-                dict_text = ""
-                if st.session_state.uploaded_dictionary is not None:
-                    dict_text = "\n\n**Data Dictionary:**\n" + st.session_state.uploaded_dictionary.to_string(index=False)
+            dict_text = ""
+            if st.session_state.uploaded_dictionary is not None:
+                dict_text = "\n\n**Data Dictionary:**\n" + st.session_state.uploaded_dictionary.to_string(index=False)
 
-                prompt = f"""
+            prompt = f"""
 You are a helpful Python code generator. 
-Your goal is to write Python code snippets based on the user's question and the provided DataFrame information.
+Your job is to write Python code based on the question and DataFrame.
 
-Here's the context:
-**User Question:**
-{question}
+**User Question:** {question}
 
-**DataFrame Name:**
-{df_name}
-
-**DataFrame Details:**
-{data_dict_text}
-
-**Sample Data (Top 2 Rows):**
-{example_record}
+**DataFrame Name:** {df_name}
+**DataFrame Info:** {data_dict_text}
+**Sample Rows:**\n{example_record}
 {dict_text}
 
 **Instructions:**
-1. Write Python code that addresses the user's question by querying or manipulating the DataFrame.
-2. Use the `exec()` function to execute your code.
-3. Do not import pandas.
-4. Use `pd.to_datetime()` for any date parsing.
-5. Store your result in a variable named `ANSWER`.
-6. Do not redefine the DataFrame — it's already in `{df_name}`.
-7. Keep the code concise and focused only on answering the question.
-8. If you need datetime or dt or np, assume it's already available.
+- Write Python code using the dataframe `df`
+- Use `exec()` to execute the code
+- Do NOT import pandas
+- Use `pd.to_datetime()` for dates
+- Save the result in a variable called `ANSWER`
+- Keep it short, focused, and avoid undefined variables
 """
 
-                code_response = model.generate_content(prompt)
-                raw_code = code_response.text
-                match = re.search(r"```python(.*?)```", raw_code, re.DOTALL)
-                generated_code = match.group(1).strip() if match else raw_code.strip()
+            code_response = model.generate_content(prompt)
+            raw_code = code_response.text
+            match = re.search(r"```python(.*?)```", raw_code, re.DOTALL)
+            generated_code = match.group(1).strip() if match else raw_code.strip()
 
-                try:
-                    local_vars = {
-                        df_name: df.copy(),
-                        "pd": pd,
-                        "datetime": datetime,
-                        "dt": pd.to_datetime,
-                        "dateparser": dateparser,
-                        "np": np,
-                        "math": math,
-                    }
+            try:
+                local_vars = {
+                    df_name: df.copy(),
+                    "pd": pd,
+                    "datetime": datetime,
+                    "dt": pd.to_datetime,
+                    "np": np,
+                    "math": math,
+                    "dateparser": dateparser
+                }
 
-                    exec(generated_code, {}, local_vars)
-                    answer = local_vars.get("ANSWER", "No variable named 'ANSWER' was created.")
+                exec(generated_code, {}, local_vars)
 
-                    if isinstance(answer, pd.DataFrame):
-                        display_data = answer.head(5).to_markdown(index=False)
-                        bot_response = summarize_as_analyst(display_data)
-                    else:
-                        bot_response = summarize_as_analyst(str(answer))
+                answer = local_vars.get("ANSWER", "No variable named 'ANSWER' was created.")
 
-                    styled_bot_response = f"""
+                if isinstance(answer, pd.DataFrame):
+                    try:
+                        answer_text = answer.head(5).to_string(index=False)
+                    except:
+                        answer_text = str(answer.head(5))
+                else:
+                    answer_text = str(answer)
+
+                bot_response = summarize_as_analyst(answer_text)
+
+                styled_bot_response = f"""
 <div style="background-color:#fff9db; padding: 1rem; border-radius: 0.5rem; border: 1px solid #f1e6b8;">
 {bot_response}
 </div>
 """
-                    st.chat_message("assistant", avatar="🤖").markdown(styled_bot_response, unsafe_allow_html=True)
+                st.chat_message("assistant", avatar="🤖").markdown(styled_bot_response, unsafe_allow_html=True)
 
-                except Exception as exec_error:
-                    bot_response = f"⚠️ Error during code execution:\n`{exec_error}`"
-                    st.chat_message("assistant", avatar="🤖").markdown(bot_response)
-
-            elif not analyze_data_checkbox:
-                bot_response = "📌 Data analysis is disabled. Please enable the checkbox to allow AI processing."
+            except NameError as name_err:
+                bot_response = f"⚠️ Variable not defined in code: `{name_err}`. Please rephrase your question or be more specific."
                 st.chat_message("assistant", avatar="🤖").markdown(bot_response)
-            else:
-                bot_response = "📂 Please upload a CSV file before asking your question."
+
+            except Exception as exec_error:
+                bot_response = f"⚠️ Code execution error:\n`{exec_error}`"
                 st.chat_message("assistant", avatar="🤖").markdown(bot_response)
 
             st.session_state.chat_history.append(("assistant", bot_response))
 
+        elif not analyze_data_checkbox:
+            bot_response = "📌 Please enable the analysis checkbox."
+            st.chat_message("assistant", avatar="🤖").markdown(bot_response)
+        else:
+            bot_response = "📂 Please upload a CSV file first."
+            st.chat_message("assistant", avatar="🤖").markdown(bot_response)
+
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
+
