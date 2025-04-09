@@ -98,7 +98,7 @@ for role, message in st.session_state.chat_history:
 # -------------------------------
 def summarize_as_analyst(answer: str) -> str:
     summary_prompt = (
-        "You are a business analyst. Summarize this result in short sentence with number only . "
+        "You are a business analyst. Summarize this result in short sentence with number only. "
         "Avoid explanation. Make it direct and suitable for executives.\n\n"
         f"{answer}"
     )
@@ -150,6 +150,7 @@ Your job is to write Python code based on the question and DataFrame.
             generated_code = match.group(1).strip() if match else raw_code.strip()
 
             try:
+                # ✅ รองรับ built-in + ตัวแปรสะกดผิด
                 local_vars = {
                     df_name: df.copy(),
                     "pd": pd,
@@ -157,7 +158,11 @@ Your job is to write Python code based on the question and DataFrame.
                     "dt": pd.to_datetime,
                     "np": np,
                     "math": math,
-                    "dateparser": dateparser
+                    "dateparser": dateparser,
+                    "__builtins__": __builtins__,
+                    "datetim": datetime,
+                    "dateime": datetime,
+                    "dtt": pd.to_datetime,
                 }
 
                 exec(generated_code, {}, local_vars)
@@ -200,4 +205,3 @@ Your job is to write Python code based on the question and DataFrame.
 
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
-
