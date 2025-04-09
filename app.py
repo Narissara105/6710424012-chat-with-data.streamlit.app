@@ -55,7 +55,7 @@ if "analyze_data_checkbox" not in st.session_state:
 # -------------------------------
 # อัปโหลดไฟล์
 # -------------------------------
-uploaded_file = st.file_uploader("📁 Upload CSV for analysis", type=["csv"])
+uploaded_file = st.file_uploader("📁 Upload CSV data for analysis", type=["csv"])
 if uploaded_file:
     try:
         df = load_flexible_csv(uploaded_file)
@@ -69,7 +69,7 @@ if uploaded_file:
     except Exception as e:
         st.error(f"❌ Error loading CSV file: {e}")
 
-uploaded_dict = st.file_uploader("📄 Upload Data Dictionary (optional)", type=["csv"])
+uploaded_dict = st.file_uploader("📄 Upload Data Dictionary", type=["csv"])
 if uploaded_dict:
     try:
         dictionary_df = pd.read_csv(uploaded_dict)
