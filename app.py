@@ -7,15 +7,11 @@ st.title("
  My Chatbot and Data Analysis App") 
 st.subheader("Conversation and Data Analysis") 
 
-
-
 # Configure Gemini API Key 
     key = st.secrets['gemini_api_key']
     genai.configure(api_key=key)
     model = genai.GenerativeModel('gemini-2.0-flash-lite')
  
-
-
 # Initialize session state for storing chat history and data 
 if "chat_history" not in st.session_state: 
 st.session_state.chat_history = []  # Initialize with an empty list 
