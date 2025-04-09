@@ -2,16 +2,16 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 
-# Set up the Streamlit app layout
+# Layout
 st.title("🤖 My Chatbot and Data Analysis App")
 st.subheader("Upload your data files below")
 
-# Configure Gemini API Key
+# API config
 key = st.secrets["gemini_api_key"]
 genai.configure(api_key=key)
 model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
-# Initialize session state
+# Session state
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "uploaded_data" not in st.session_state:
@@ -19,12 +19,12 @@ if "uploaded_data" not in st.session_state:
 if "metadata" not in st.session_state:
     st.session_state.metadata = None
 
-# ---------- Function to Build Prompt ----------
+# Prompt generator
 def generate_code_prompt(question, df_name, data_df, metadata_df):
     data_dict_text = metadata_df.to_string(index=False) if metadata_df is not None else "No metadata provided."
     example_record = data_df.head(2).to_string(index=False)
 
-    prompt = f"""
+    return f"""
 You are a helpful Python code generator.
 Your goal is to write Python code snippets based on the user's question and the provided DataFrame information.
 
@@ -48,42 +48,36 @@ Here's the context:
 7. Keep the generated code concise and focused on answering the question.
 8. If the question requires a specific output format (e.g., a list, a single value), ensure `ANSWER` holds that format.
 """
-    return prompt
 
-# ---------- File Upload Section ----------
+# -------- FILE UPLOAD --------
 st.subheader("Upload Required Files")
 
-uploaded_files = st.file_uploader(
-    "Upload 'transactions.csv' and 'data_dict.csv'",
-    type=["csv"],
-    accept_multiple_files=True
-)
+# Upload transactions.csv
+transactions_file = st.file_uploader("Upload transactions.csv", type=["csv"], key="transactions")
+if transactions_file:
+    try:
+        st.session_state.uploaded_data = pd.read_csv(transactions_file)
+        st.success("✅ transactions.csv loaded successfully.")
+        st.write("### Transactions Preview")
+        st.dataframe(st.session_state.uploaded_data.head())
+    except Exception as e:
+        st.error(f"Error loading transactions.csv: {e}")
 
-# Process uploaded files
-for uploaded_file in uploaded_files or []:
-    if uploaded_file.name == "transactions.csv":
-        try:
-            st.session_state.uploaded_data = pd.read_csv(uploaded_file)
-            st.success("✅ transactions.csv loaded successfully.")
-            st.write("### Transactions Preview")
-            st.dataframe(st.session_state.uploaded_data.head())
-        except Exception as e:
-            st.error(f"❌ Failed to read transactions.csv: {e}")
-    elif uploaded_file.name == "data_dict.csv":
-        try:
-            st.session_state.metadata = pd.read_csv(uploaded_file)
-            st.success("✅ data_dict.csv (metadata) loaded successfully.")
-            st.write("### Metadata Preview")
-            st.dataframe(st.session_state.metadata.head())
-        except Exception as e:
-            st.error(f"❌ Failed to read data_dict.csv: {e}")
-    else:
-        st.warning(f"⚠️ Unexpected file: {uploaded_file.name}. Expected 'transactions.csv' or 'data_dict.csv'")
+# Upload data_dict.csv
+data_dict_file = st.file_uploader("Upload data_dict.csv (Metadata)", type=["csv"], key="dictionary")
+if data_dict_file:
+    try:
+        st.session_state.metadata = pd.read_csv(data_dict_file)
+        st.success("✅ data_dict.csv loaded successfully.")
+        st.write("### Metadata Preview")
+        st.dataframe(st.session_state.metadata.head())
+    except Exception as e:
+        st.error(f"Error loading data_dict.csv: {e}")
 
-# ---------- Checkbox to toggle AI code generation ----------
-analyze_data_checkbox = st.checkbox("Analyze CSV Data with AI")
+# -------- CHECKBOX (Auto-checked) --------
+analyze_data_checkbox = st.checkbox("Analyze CSV Data with AI", value=st.session_state.uploaded_data is not None)
 
-# ---------- Chat Section ----------
+# -------- CHAT --------
 if user_input := st.chat_input("Type your message here..."):
     st.session_state.chat_history.append(("user", user_input))
     st.chat_message("user").markdown(user_input)
@@ -93,10 +87,10 @@ if user_input := st.chat_input("Type your message here..."):
             if st.session_state.uploaded_data is not None:
                 df_name = "df"
                 df = st.session_state.uploaded_data.copy()
-                globals()[df_name] = df
+                globals()[df_name] = df  # For exec()
 
                 if analyze_data_checkbox:
-                    # Generate Python code with full context
+                    # Generate Python code with context
                     prompt = generate_code_prompt(
                         question=user_input,
                         df_name=df_name,
@@ -124,10 +118,8 @@ if user_input := st.chat_input("Type your message here..."):
                         f"The user says: '{user_input}'\n\n"
                         f"Here is the dataset description:\n{data_description}"
                     )
-
                     if st.session_state.metadata is not None:
-                        metadata_description = st.session_state.metadata.to_string()
-                        prompt += f"\n\nAnd here is the metadata:\n{metadata_description}"
+                        prompt += f"\n\nMetadata:\n{st.session_state.metadata.to_string()}"
 
                     prompt += "\n\nNote: The user has not requested code, but data context may help."
 
@@ -136,8 +128,6 @@ if user_input := st.chat_input("Type your message here..."):
                     st.session_state.chat_history.append(("assistant", bot_response))
                     st.chat_message("assistant").markdown(bot_response)
             else:
-                st.warning("Please upload 'transactions.csv' to enable chat or analysis.")
+                st.warning("⚠️ Please upload transactions.csv to begin.")
         except Exception as e:
-            st.error(f"An error occurred while generating the response: {e}")
-    else:
-        st.warning("Please configure the Gemini API Key to enable chat responses.")
+            st.error(f"An error occurred: {e}")
