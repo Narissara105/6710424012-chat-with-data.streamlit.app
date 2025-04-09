@@ -105,6 +105,13 @@ for role, message in st.session_state.chat_history:
 # -------------------------------
 def summarize_as_analyst(answer: str) -> str:
     summary_prompt = f"""
+คุณเป็นนักวิเคราะห์ข้อมูลที่เชี่ยวชาญ
+สรุปคำตอบให้สั้นที่สุด โดยแสดงเพียงค่าคำตอบเป็นตัวเลขหรือข้อความที่เกี่ยวข้องโดยตรงเท่านั้น
+ห้ามอธิบายเพิ่มเติม ห้ามใส่คำว่า 'ผลลัพธ์ดิบ:'
+
+{answer}"""
+    response = model.generate_content(summary_prompt)
+    return response.text.strip()
 คุณเป็นผู้ช่วยนักวิเคราะห์ข้อมูลที่เชี่ยวชาญในการเขียนโค้ด Python เพื่อดึงข้อมูลจาก DataFrame ตามคำถามของผู้ใช้ (ภาษาไทย)
 
 **คำถามของผู้ใช้:** {question}
@@ -174,4 +181,3 @@ def summarize_as_analyst(answer: str) -> str:
 
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาด: {e}")
-
