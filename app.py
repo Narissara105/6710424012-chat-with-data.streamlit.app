@@ -37,7 +37,7 @@ def load_flexible_csv(uploaded_file):
 # -------------------------------
 st.set_page_config(page_title="Chat with Data 🤖", layout="wide")
 st.title("🤖 My Chatbot and Data Analysis App")
-st.subheader("ถามคำถามเชิงธุรกิจ แล้วรับคำตอบจากข้อมูลของคุณ")
+st.subheader("ถามคำถามจากไฟล์ csv ที่อัพโหลดมาได้เลย")
 
 key = st.secrets["gemini_api_key"]
 genai.configure(api_key=key)
@@ -97,11 +97,13 @@ for role, message in st.session_state.chat_history:
         st.markdown(message)
 
 # -------------------------------
-# ฟังก์ชันสรุปแบบผู้บริหาร
+# ✅ สรุปแบบผู้บริหาร “สั้นที่สุด”
 # -------------------------------
 def summarize_as_analyst(answer: str) -> str:
     summary_prompt = (
-        "You are a senior business analyst. Summarize this result in 1-3 short executive-level sentences:\n\n"
+        "You are a senior business analyst. "
+        "Provide the shortest possible executive summary in 1–2 short sentences. "
+        "Avoid explanation. Be direct, insightful, and business-focused.\n\n"
         f"{answer}"
     )
     summary_response = model.generate_content(summary_prompt)
