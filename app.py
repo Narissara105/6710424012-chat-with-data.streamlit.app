@@ -94,17 +94,14 @@ for role, message in st.session_state.chat_history:
         st.markdown(message)
 
 # -------------------------------
-# สรุปคำตอบแบบผู้บริหาร (กระชับมาก)
+# ✅ ฟังก์ชันสรุปผลแบบสั้น ตรงคำถาม
 # -------------------------------
 def summarize_as_analyst(answer: str) -> str:
     summary_prompt = (
-        """You are a business analyst. 
-Summarize this result for executives level for making decision. 
-Make it briefly with significant information. 
-Answer the best answer without requesting other information.
-
-"""
-        + answer
+        "As a senior business analyst, answer the user's question clearly and directly. "
+        "Use only key numbers or facts found in the result. Do not explain, do not add interpretation. "
+        "Avoid vague words. Keep it under 2 short sentences. Focus only on what the answer is.\n\n"
+        f"Raw result:\n{answer}"
     )
     response = model.generate_content(summary_prompt)
     return response.text.strip()
@@ -165,7 +162,7 @@ Your job is to write Python code based on the question and DataFrame.
                     "dateparser": dateparser,
                     "__builtins__": __builtins__,
 
-                    # Alias เผื่อ AI ใช้ผิด
+                    # Alias รองรับการสะกดผิดของ AI
                     "datetim": datetime,
                     "dateime": datetime,
                     "dtt": pd.to_datetime,
