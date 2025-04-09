@@ -5,20 +5,6 @@ import re
 import datetime
 
 # -------------------------------
-# CSS: Barbie Pink Background
-# -------------------------------
-st.markdown(
-    """
-    <style>
-        .stApp {
-            background-color: #ffe6f0;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# -------------------------------
 # ฟังก์ชันโหลด CSV แบบยืดหยุ่น
 # -------------------------------
 def load_flexible_csv(uploaded_file):
@@ -47,8 +33,8 @@ def load_flexible_csv(uploaded_file):
 # ตั้งค่า Gemini
 # -------------------------------
 st.set_page_config(page_title="Chat with Data 🤖", layout="wide")
-st.title("💖 Business AI Assistant for Executives")
-st.subheader("Summarized insights. Real data. Barbie-powered 💼")
+st.title("🤖 My Chatbot and Data Analysis App")
+st.subheader("Ask business questions. Get real data-driven answers.")
 
 key = st.secrets["gemini_api_key"]
 genai.configure(api_key=key)
@@ -69,7 +55,7 @@ if "analyze_data_checkbox" not in st.session_state:
 # -------------------------------
 # อัปโหลดไฟล์
 # -------------------------------
-uploaded_file = st.file_uploader("📁 Upload CSV data for analysis", type=["csv"])
+uploaded_file = st.file_uploader("📁 Upload CSV for analysis", type=["csv"])
 if uploaded_file:
     try:
         df = load_flexible_csv(uploaded_file)
@@ -77,6 +63,8 @@ if uploaded_file:
         st.success("✅ File successfully uploaded and read.")
         st.write("### Uploaded Data Preview")
         st.dataframe(df.head())
+
+        # ✅ Auto-check เมื่อมีไฟล์
         st.session_state.analyze_data_checkbox = True
     except Exception as e:
         st.error(f"❌ Error loading CSV file: {e}")
@@ -108,22 +96,21 @@ for role, message in st.session_state.chat_history:
         st.markdown(message)
 
 # -------------------------------
-# ฟังก์ชันสรุปแบบผู้บริหาร
+# ฟังก์ชันสรุปแบบนักวิเคราะห์
 # -------------------------------
-def summarize_for_executive(answer: str) -> str:
+def summarize_as_analyst(answer: str) -> str:
     summary_prompt = (
-        "You are a senior business analyst creating a very short and sharp insight "
-        "for a C-level executive (CEO, CFO). Summarize the result clearly in 1–2 concise sentences "
-        "highlighting what matters most for decision-making:\n\n"
+        "You are a senior business analyst. Please summarize the following result "
+        "in clear and formal business language for decision-makers:\n\n"
         f"{answer}"
     )
     summary_response = model.generate_content(summary_prompt)
-    return summary_response.text.strip()
+    return summary_response.text
 
 # -------------------------------
 # รับคำถามจากผู้ใช้
 # -------------------------------
-if user_input := st.chat_input("Ask your business question..."):
+if user_input := st.chat_input("Type your business question about the data..."):
     st.chat_message("user", avatar="🙂").markdown(user_input)
     st.session_state.chat_history.append(("user", user_input))
 
@@ -187,9 +174,9 @@ Here's the context:
 
                     if isinstance(answer, pd.DataFrame):
                         display_data = answer.head(5).to_markdown(index=False)
-                        bot_response = summarize_for_executive(display_data)
+                        bot_response = summarize_as_analyst(display_data)
                     else:
-                        bot_response = summarize_for_executive(str(answer))
+                        bot_response = summarize_as_analyst(str(answer))
 
                     st.chat_message("assistant", avatar="🤖").markdown(bot_response)
 
