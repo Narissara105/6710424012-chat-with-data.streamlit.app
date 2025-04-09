@@ -64,7 +64,7 @@ if "qa_memory" not in st.session_state:
 # -------------------------------
 # Upload Files
 # -------------------------------
-uploaded_file = st.file_uploader("\U0001F4C1 อัปโหลดไฟล์ CSV สำหรับวิเคราะห์", type=["csv"])
+uploaded_file = st.file_uploader("📁 อัปโหลดไฟล์ CSV สำหรับวิเคราะห์", type=["csv"])
 if uploaded_file:
     try:
         df = load_flexible_csv(uploaded_file)
@@ -76,7 +76,7 @@ if uploaded_file:
     except Exception as e:
         st.error(f"❌ ไม่สามารถอ่านไฟล์ได้: {e}")
 
-uploaded_dict = st.file_uploader("\U0001F4C4 อัปโหลด Data Dictionary (ถ้ามี)", type=["csv"])
+uploaded_dict = st.file_uploader("📄 อัปโหลด Data Dictionary (ถ้ามี)", type=["csv"])
 if uploaded_dict:
     try:
         dictionary_df = pd.read_csv(uploaded_dict)
@@ -112,15 +112,34 @@ def summarize_as_analyst(answer: str) -> str:
 {answer}"""
     response = model.generate_content(summary_prompt)
     return response.text.strip()
+
+# -------------------------------
+# รับคำถามจากผู้ใช้
+# -------------------------------
+if user_input := st.chat_input("พิมพ์คำถามด้านข้อมูลของคุณที่นี่..."):
+    st.chat_message("user", avatar="🙂").markdown(user_input)
+    st.session_state.chat_history.append(("user", user_input))
+
+    try:
+        if model and st.session_state.uploaded_data is not None and analyze_data_checkbox:
+            df = st.session_state.uploaded_data
+            df_name = "df"
+            question = user_input
+            data_dict_text = df.dtypes.astype(str).to_string()
+            example_record = df.head(2).to_string(index=False)
+
+            dict_text = ""
+            if st.session_state.uploaded_dictionary is not None:
+                dict_text = "\n\n**Data Dictionary:**\n" + st.session_state.uploaded_dictionary.to_string(index=False)
+
+            prompt = f"""
 คุณเป็นผู้ช่วยนักวิเคราะห์ข้อมูลที่เชี่ยวชาญในการเขียนโค้ด Python เพื่อดึงข้อมูลจาก DataFrame ตามคำถามของผู้ใช้ (ภาษาไทย)
 
 **คำถามของผู้ใช้:** {question}
 
 **ชื่อ DataFrame:** {df_name}
-**ข้อมูลคอลัมน์:**
-{data_dict_text}
-**ตัวอย่างข้อมูล 2 แถวแรก:**
-{example_record}
+**ข้อมูลคอลัมน์:**\n{data_dict_text}
+**ตัวอย่างข้อมูล 2 แถวแรก:**\n{example_record}
 {dict_text}
 
 **คำแนะนำ:**
@@ -128,7 +147,8 @@ def summarize_as_analyst(answer: str) -> str:
 - แปลงคอลัมน์วันที่เป็น datetime ด้วย pd.to_datetime()
 - บันทึกผลลัพธ์ในตัวแปรชื่อว่า ANSWER เท่านั้น
 - ถ้าคำถามขออันดับ เช่น 5 อันดับ, ให้ตอบเป็น DataFrame ที่แสดงชื่อ + ค่าที่เกี่ยวข้อง
-- ถ้าคำถามถามยอดรวม ให้ตอบเป็นตัวเลขรวมเดียว
+- ถ้าคำถามถามยอดรวม ให้ตอบเป็นตัวเลขรวมเดียว 
+- ถ้าถามว่าให้เปรียบเทียบยอดขายเทียบระหว่างเดือน ให้ดูการเพิ่มขึ้นลดลงเท่าไหร่ด้วย
 - ห้าม import pandas หรือ datetime
 - อย่าใช้ตัวแปรที่ไม่ถูกกำหนด
 - เขียนโค้ดให้สั้น ตรงประเด็น และมีความหมายทางธุรกิจชัดเจน
@@ -166,9 +186,7 @@ def summarize_as_analyst(answer: str) -> str:
                 answer_text = str(answer)
 
             bot_response = summarize_as_analyst(answer_text)
-
             styled_bot_response = bot_response
-            st.session_state.qa_memory[normalized_question] = styled_bot_response
             st.chat_message("assistant", avatar="🤖").markdown(styled_bot_response, unsafe_allow_html=True)
             st.session_state.chat_history.append(("assistant", styled_bot_response))
 
