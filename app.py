@@ -7,7 +7,7 @@ st.set_page_config(page_title="Chat with Data 🤖", layout="wide")
 
 # Title
 st.title("🤖 My Chatbot and Data Analysis App")
-st.subheader("ChatGPT-style Experience + CSV Insight")
+st.subheader("อยากรู้อะไรเกี่ยวกับข้อมูลที่อัพโหลดไป ถามฉันมาได้เลยค่ะ")
 
 # --- Configure Gemini API Key ---
 key = st.secrets["gemini_api_key"]
