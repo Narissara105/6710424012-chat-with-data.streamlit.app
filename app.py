@@ -1,133 +1,143 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-import re
 
-# --- Page setup ---
-st.set_page_config(page_title="Chat with Data 🤖", layout="wide")
+# Set up the Streamlit app layout
 st.title("🤖 My Chatbot and Data Analysis App")
-st.subheader("ChatGPT-style Experience with Business Insights")
+st.subheader("Upload your data files below")
 
-# --- Gemini API Key ---
+# Configure Gemini API Key
 key = st.secrets["gemini_api_key"]
 genai.configure(api_key=key)
 model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
-# --- Initialize session state ---
+# Initialize session state
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "uploaded_data" not in st.session_state:
     st.session_state.uploaded_data = None
-if "uploaded_metadata" not in st.session_state:
-    st.session_state.uploaded_metadata = None
+if "metadata" not in st.session_state:
+    st.session_state.metadata = None
 
-# --- Sidebar Upload Section ---
-with st.sidebar:
-    st.header("📂 Upload Files")
-    uploaded_file = st.file_uploader("Upload Data CSV", type=["csv"])
-    if uploaded_file:
+# ---------- Function to Build Prompt ----------
+def generate_code_prompt(question, df_name, data_df, metadata_df):
+    data_dict_text = metadata_df.to_string(index=False) if metadata_df is not None else "No metadata provided."
+    example_record = data_df.head(2).to_string(index=False)
+
+    prompt = f"""
+You are a helpful Python code generator.
+Your goal is to write Python code snippets based on the user's question and the provided DataFrame information.
+
+Here's the context:
+**User Question:**
+{question}
+**DataFrame Name:**
+{df_name}
+**DataFrame Details:**
+{data_dict_text}
+**Sample Data (Top 2 Rows):**
+{example_record}
+
+**Instructions:**
+1. Write Python code that addresses the user's question by querying or manipulating the DataFrame.
+2. **Crucially, use the `exec()` function to execute the generated code.**
+3. Do not import pandas
+4. Change date column type to datetime
+5. **Store the result of the executed code in a variable named `ANSWER`.**
+6. Assume the DataFrame is already loaded into a pandas DataFrame object named `{df_name}`.
+7. Keep the generated code concise and focused on answering the question.
+8. If the question requires a specific output format (e.g., a list, a single value), ensure `ANSWER` holds that format.
+"""
+    return prompt
+
+# ---------- File Upload Section ----------
+st.subheader("Upload Required Files")
+
+uploaded_files = st.file_uploader(
+    "Upload 'transactions.csv' and 'data_dict.csv'",
+    type=["csv"],
+    accept_multiple_files=True
+)
+
+# Process uploaded files
+for uploaded_file in uploaded_files or []:
+    if uploaded_file.name == "transactions.csv":
         try:
             st.session_state.uploaded_data = pd.read_csv(uploaded_file)
-            st.success("✅ Data uploaded successfully")
+            st.success("✅ transactions.csv loaded successfully.")
+            st.write("### Transactions Preview")
+            st.dataframe(st.session_state.uploaded_data.head())
         except Exception as e:
-            st.error(f"❌ Failed to read data: {e}")
-
-    uploaded_metadata = st.file_uploader("Upload Metadata CSV (optional)", type=["csv"])
-    if uploaded_metadata:
+            st.error(f"❌ Failed to read transactions.csv: {e}")
+    elif uploaded_file.name == "data_dict.csv":
         try:
-            st.session_state.uploaded_metadata = pd.read_csv(uploaded_metadata)
-            st.success("✅ Metadata uploaded successfully")
+            st.session_state.metadata = pd.read_csv(uploaded_file)
+            st.success("✅ data_dict.csv (metadata) loaded successfully.")
+            st.write("### Metadata Preview")
+            st.dataframe(st.session_state.metadata.head())
         except Exception as e:
-            st.error(f"❌ Failed to read metadata: {e}")
+            st.error(f"❌ Failed to read data_dict.csv: {e}")
+    else:
+        st.warning(f"⚠️ Unexpected file: {uploaded_file.name}. Expected 'transactions.csv' or 'data_dict.csv'")
 
-    analyze_data_checkbox = st.checkbox("🔍 Analyze CSV Data with AI", value=True)
+# ---------- Checkbox to toggle AI code generation ----------
+analyze_data_checkbox = st.checkbox("Analyze CSV Data with AI")
 
-# --- Optional Data Preview ---
-if st.session_state.uploaded_data is not None:
-    with st.expander("📊 Data Preview"):
-        st.dataframe(st.session_state.uploaded_data.head())
-
-if st.session_state.uploaded_metadata is not None:
-    with st.expander("📄 Metadata Preview"):
-        st.dataframe(st.session_state.uploaded_metadata.head())
-
-# --- Show chat history ---
-for role, message in st.session_state.chat_history:
-    avatar = "🙂" if role == "user" else "🤖"
-    with st.chat_message(role, avatar=avatar):
-        st.markdown(message)
-
-# --- Function: Summarize as Business Analyst ---
-def summarize_result_as_analyst(result: str) -> str:
-    summary_prompt = (
-        "You are a senior business analyst. Based on the following analysis result, "
-        "write a clear, formal, and insightful summary for a business decision-maker.\n\n"
-        f"Result:\n{result}"
-    )
-    summary = model.generate_content(summary_prompt)
-    return summary.text
-
-# --- User input ---
-if user_input := st.chat_input("Ask a question about your data..."):
-    st.chat_message("user", avatar="🙂").markdown(user_input)
+# ---------- Chat Section ----------
+if user_input := st.chat_input("Type your message here..."):
     st.session_state.chat_history.append(("user", user_input))
+    st.chat_message("user").markdown(user_input)
 
-    bot_response = ""
-    try:
-        df = st.session_state.uploaded_data
+    if model:
+        try:
+            if st.session_state.uploaded_data is not None:
+                df_name = "df"
+                df = st.session_state.uploaded_data.copy()
+                globals()[df_name] = df
 
-        if df is None:
-            bot_response = "📂 Please upload a CSV file before asking about the data."
-        elif not analyze_data_checkbox:
-            bot_response = "🛑 Data analysis is disabled. Please check the 'Analyze CSV Data with AI' option."
-        else:
-            # Build the prompt: ask for pandas code only (internal)
-            columns_info = ", ".join(df.columns)
-            prompt = (
-                f"The dataset has these columns: {columns_info}.\n"
-                f"Write a single line of Python pandas code (no explanation) using the dataframe 'df' to answer:\n"
-                f"'{user_input}'"
-            )
+                if analyze_data_checkbox:
+                    # Generate Python code with full context
+                    prompt = generate_code_prompt(
+                        question=user_input,
+                        df_name=df_name,
+                        data_df=st.session_state.uploaded_data,
+                        metadata_df=st.session_state.metadata,
+                    )
 
-            # Ask Gemini for pandas code
-            code_response = model.generate_content(prompt)
-            raw_code = code_response.text
+                    response = model.generate_content(prompt)
+                    generated_code = response.text
 
-            # Extract and clean code
-            code_block = re.findall(r"```(?:python)?\s*(.*?)```", raw_code, re.DOTALL)
-            pandas_code = code_block[0] if code_block else raw_code.strip()
-            lines = pandas_code.splitlines()
-            clean_lines = [
-                line for line in lines
-                if line.strip() and not line.strip().startswith("#")
-            ]
-            pandas_code = "\n".join(clean_lines)
+                    st.markdown("#### 🧠 Generated Python Code")
+                    st.code(generated_code, language="python")
 
-            # Try executing the pandas code
-            try:
-                local_vars = {"df": df.copy()}
-                exec("result = " + pandas_code, {}, local_vars)
-                result = local_vars["result"]
-
-                # Convert result to markdown for AI summary
-                if isinstance(result, pd.DataFrame):
-                    result_text = result.head(5).to_markdown(index=False)
+                    try:
+                        exec(generated_code, globals())
+                        st.success("✅ Code executed successfully.")
+                        st.markdown("#### 📊 Result (from `ANSWER`):")
+                        st.write(globals().get("ANSWER", "No variable `ANSWER` was defined."))
+                    except Exception as e:
+                        st.error(f"⚠️ Error while executing the code:\n\n{e}")
                 else:
-                    result_text = str(result)
+                    # General chat with data context
+                    data_description = df.describe().to_string()
+                    prompt = (
+                        f"The user says: '{user_input}'\n\n"
+                        f"Here is the dataset description:\n{data_description}"
+                    )
 
-                # Business-style summary
-                bot_response = summarize_result_as_analyst(result_text)
-                st.chat_message("assistant", avatar="🤖").markdown(bot_response)
+                    if st.session_state.metadata is not None:
+                        metadata_description = st.session_state.metadata.to_string()
+                        prompt += f"\n\nAnd here is the metadata:\n{metadata_description}"
 
-            except Exception as e:
-                bot_response = (
-                    f"⚠️ I encountered an error while processing your request. "
-                    f"Please try rephrasing your question.\n\nError: `{e}`"
-                )
-                st.chat_message("assistant", avatar="🤖").markdown(bot_response)
+                    prompt += "\n\nNote: The user has not requested code, but data context may help."
 
-    except Exception as e:
-        bot_response = f"⚠️ Something went wrong: {e}"
-        st.chat_message("assistant", avatar="🤖").markdown(bot_response)
-
-    st.session_state.chat_history.append(("assistant", bot_response))
+                    response = model.generate_content(prompt)
+                    bot_response = response.text
+                    st.session_state.chat_history.append(("assistant", bot_response))
+                    st.chat_message("assistant").markdown(bot_response)
+            else:
+                st.warning("Please upload 'transactions.csv' to enable chat or analysis.")
+        except Exception as e:
+            st.error(f"An error occurred while generating the response: {e}")
+    else:
+        st.warning("Please configure the Gemini API Key to enable chat responses.")
