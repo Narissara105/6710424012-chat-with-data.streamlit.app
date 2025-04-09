@@ -105,71 +105,46 @@ for role, message in st.session_state.chat_history:
 # -------------------------------
 def summarize_as_analyst(answer: str) -> str:
     summary_prompt = f"""
-คุณเป็นนักวิเคราะห์ข้อมูลที่เชี่ยวชาญ
-สรุปคำตอบให้สั้นที่สุด โดยแสดงเพียงค่าคำตอบเป็นตัวเลขหรือข้อความที่เกี่ยวข้องโดยตรงเท่านั้น
-ห้ามอธิบายเพิ่มเติม ห้ามใส่คำว่า 'ผลลัพธ์ดิบ:'
+You are a multilingual data analyst assistant who writes Python code to answer user questions based on a pandas DataFrame.
 
-{answer}"""
-    response = model.generate_content(summary_prompt)
-    return response.text.strip()
+**User Question:** {question}
 
-# -------------------------------
-# รับคำถามจากผู้ใช้
-# -------------------------------
-if user_input := st.chat_input("พิมพ์คำถามด้านข้อมูลของคุณที่นี่..."):
-    st.chat_message("user", avatar="🙂").markdown(user_input)
-    st.session_state.chat_history.append(("user", user_input))
-
-    try:
-        if model and st.session_state.uploaded_data is not None and analyze_data_checkbox:
-            df = st.session_state.uploaded_data
-            # รวมไฟล์ข้อมูลอื่น ๆ (ถ้ามี)
-            if isinstance(df, list):
-                df = pd.concat(df, ignore_index=True)
-            elif hasattr(st.session_state, "uploaded_extra"):
-                try:
-                    extra_df = st.session_state.uploaded_extra
-                    if isinstance(extra_df, list):
-                        df = pd.concat([df] + extra_df, ignore_index=True)
-                    elif isinstance(extra_df, pd.DataFrame):
-                        df = pd.concat([df, extra_df], ignore_index=True)
-                except:
-                    pass
-            st.session_state.uploaded_data = df
-            df_name = "df"
-            question = user_input
-            data_dict_text = df.dtypes.astype(str).to_string()
-            example_record = df.head(2).to_string(index=False)
-
-            dict_text = ""
-            if st.session_state.uploaded_dictionary is not None:
-                dict_text = "\n\n**Data Dictionary:**\n" + st.session_state.uploaded_dictionary.to_string(index=False)
-
-            prompt = f"""
-คุณเป็นผู้ช่วยนักวิเคราะห์ข้อมูลที่เชี่ยวชาญในการเขียนโค้ด Python เพื่อดึงข้อมูลจาก DataFrame ตามคำถามของผู้ใช้ (ภาษาไทย)
-
-**คำถามของผู้ใช้:** {question}
-
-**ชื่อ DataFrame:** {df_name}
-**ข้อมูลคอลัมน์:**\n{data_dict_text}
-**ตัวอย่างข้อมูล 2 แถวแรก:**\n{example_record}
+**DataFrame Name:** {df_name}
+**DataFrame Info:**
+{data_dict_text}
+**Sample Rows:**
+{example_record}
 {dict_text}
 
-**คำแนะนำ:**
-- ใช้ exec() ในการรันโค้ด
-- แปลงคอลัมน์วันที่เป็น datetime ด้วย pd.to_datetime()
-- บันทึกผลลัพธ์ในตัวแปรชื่อว่า ANSWER เท่านั้น
-- ถ้าคำถามขออันดับ เช่น 5 อันดับ, ให้ตอบเป็น DataFrame ที่แสดงชื่อ + ค่าที่เกี่ยวข้อง
-- ถ้าคำถามถามยอดรวม ให้ตอบเป็นตัวเลขรวมเดียว 
-- ห้าม import pandas หรือ datetime
-- อย่าใช้ตัวแปรที่ไม่ถูกกำหนด
-- เขียนโค้ดให้สั้น ตรงประเด็น และมีความหมายทางธุรกิจชัดเจน
+**Instructions:**
+- Write Python code using the dataframe `df`
+- Use `exec()` to execute the code
+- Convert date columns using `pd.to_datetime()`
+- Save the result in a variable named `ANSWER`
+- If the question asks for ranking or top N, return a DataFrame with name/value
+- If the question asks for total/sum, return a single number
+- DO NOT import pandas or datetime
+- Do NOT use undefined variables
+- Be brief, accurate, and business-relevant in your result
 """
 
             code_response = model.generate_content(prompt)
             raw_code = code_response.text
             match = re.search(r"```python(.*?)```", raw_code, re.DOTALL)
             generated_code = match.group(1).strip() if match else raw_code.strip()
+
+            # ตรวจสอบว่าเคยตอบคำถามนี้หรือคำถามใกล้เคียงแล้วหรือยัง (fuzzy match)
+            if process and st.session_state.qa_memory:
+                similar_question, score, _ = process.extractOne(
+                    question,
+                    list(st.session_state.qa_memory.keys()),
+                    score_cutoff=90
+                )
+                if similar_question:
+                    cached_answer = st.session_state.qa_memory[similar_question]
+                    st.chat_message("assistant", avatar="🤖").markdown(cached_answer, unsafe_allow_html=True)
+                    st.session_state.chat_history.append(("assistant", cached_answer))
+                    raise Exception("✅ คำถามซ้ำ ตอบจาก cache")
 
             local_vars = {
                 df_name: df.copy(),
@@ -201,6 +176,7 @@ if user_input := st.chat_input("พิมพ์คำถามด้านข้
             styled_bot_response = bot_response
             st.chat_message("assistant", avatar="🤖").markdown(styled_bot_response, unsafe_allow_html=True)
             st.session_state.chat_history.append(("assistant", styled_bot_response))
+            st.session_state.qa_memory[question] = styled_bot_response
 
         elif not analyze_data_checkbox:
             bot_response = "📌 โปรดเปิดใช้งานกล่องวิเคราะห์ข้อมูลก่อน"
