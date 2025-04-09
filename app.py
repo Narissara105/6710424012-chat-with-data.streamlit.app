@@ -6,7 +6,7 @@ import re
 # --- Page setup ---
 st.set_page_config(page_title="Chat with Data 🤖", layout="wide")
 st.title("🤖 My Chatbot and Data Analysis App")
-st.subheader("ChatGPT-style Experience + Real CSV Intelligence")
+st.subheader("ChatGPT-style Experience with Business Insights")
 
 # --- Gemini API Key ---
 key = st.secrets["gemini_api_key"]
@@ -21,14 +21,14 @@ if "uploaded_data" not in st.session_state:
 if "uploaded_metadata" not in st.session_state:
     st.session_state.uploaded_metadata = None
 
-# --- Sidebar: Upload files ---
+# --- Sidebar Upload Section ---
 with st.sidebar:
     st.header("📂 Upload Files")
     uploaded_file = st.file_uploader("Upload Data CSV", type=["csv"])
     if uploaded_file:
         try:
             st.session_state.uploaded_data = pd.read_csv(uploaded_file)
-            st.success("✅ Data uploaded")
+            st.success("✅ Data uploaded successfully")
         except Exception as e:
             st.error(f"❌ Failed to read data: {e}")
 
@@ -36,13 +36,13 @@ with st.sidebar:
     if uploaded_metadata:
         try:
             st.session_state.uploaded_metadata = pd.read_csv(uploaded_metadata)
-            st.success("✅ Metadata uploaded")
+            st.success("✅ Metadata uploaded successfully")
         except Exception as e:
             st.error(f"❌ Failed to read metadata: {e}")
 
     analyze_data_checkbox = st.checkbox("🔍 Analyze CSV Data with AI", value=True)
 
-# --- Preview Data ---
+# --- Optional Data Preview ---
 if st.session_state.uploaded_data is not None:
     with st.expander("📊 Data Preview"):
         st.dataframe(st.session_state.uploaded_data.head())
@@ -51,19 +51,18 @@ if st.session_state.uploaded_metadata is not None:
     with st.expander("📄 Metadata Preview"):
         st.dataframe(st.session_state.uploaded_metadata.head())
 
-# --- Display chat history ---
+# --- Show chat history ---
 for role, message in st.session_state.chat_history:
     avatar = "🙂" if role == "user" else "🤖"
     with st.chat_message(role, avatar=avatar):
         st.markdown(message)
 
-# --- Chat input ---
+# --- User input ---
 if user_input := st.chat_input("Ask a question about your data..."):
     st.chat_message("user", avatar="🙂").markdown(user_input)
     st.session_state.chat_history.append(("user", user_input))
 
     bot_response = ""
-
     try:
         df = st.session_state.uploaded_data
 
@@ -72,21 +71,18 @@ if user_input := st.chat_input("Ask a question about your data..."):
         elif not analyze_data_checkbox:
             bot_response = "🛑 Data analysis is disabled. Please check the 'Analyze CSV Data with AI' option."
         else:
-            # Build the prompt for Gemini
+            # Build the prompt: ask for Python code only (internally)
             columns_info = ", ".join(df.columns)
-            schema_info = f"The dataset contains these columns: {columns_info}.\n"
             prompt = (
-                f"{schema_info}"
-                f"Write a single pandas Python expression (no print, no explanation) to answer this: \n"
-                f"'{user_input}'\n"
-                f"Use the dataframe 'df'. Only return one line of code."
+                f"The dataset has these columns: {columns_info}.\n"
+                f"Write a single line of Python pandas code (no explanation) using the dataframe 'df' to answer:\n"
+                f"'{user_input}'"
             )
 
-            # Ask Gemini to generate code
             code_response = model.generate_content(prompt)
-
-            # Clean the AI response
             raw_code = code_response.text
+
+            # Extract and clean code
             code_block = re.findall(r"```(?:python)?\s*(.*?)```", raw_code, re.DOTALL)
             pandas_code = code_block[0] if code_block else raw_code.strip()
             lines = pandas_code.splitlines()
@@ -96,27 +92,31 @@ if user_input := st.chat_input("Ask a question about your data..."):
             ]
             pandas_code = "\n".join(clean_lines)
 
-            # Try running the pandas code
+            # Try executing the pandas code
             try:
                 local_vars = {"df": df.copy()}
                 exec("result = " + pandas_code, {}, local_vars)
                 result = local_vars["result"]
 
+                # Now ask Gemini to summarize the result formally
                 if isinstance(result, pd.DataFrame):
-                    bot_response = f"Here’s what I found:\n\n```python\n{pandas_code}\n```"
-                    st.chat_message("assistant", avatar="🤖").markdown(bot_response)
-                    st.dataframe(result)
+                    result_summary = result.head(5).to_markdown(index=False)
                 else:
-                    bot_response = f"```python\n{pandas_code}\n```\n\n**Result:** {result}"
-                    st.chat_message("assistant", avatar="🤖").markdown(bot_response)
+                    result_summary = str(result)
 
-            except SyntaxError as se:
-                bot_response = f"❌ Syntax Error:\n```\n{se}\n```\nCheck your question or try again with simpler wording."
+                summary_prompt = (
+                    f"Please explain the following result in a clear, professional business summary:\n\n{result_summary}"
+                )
+                final_response = model.generate_content(summary_prompt)
+                bot_response = final_response.text
+
+                # Show response
                 st.chat_message("assistant", avatar="🤖").markdown(bot_response)
+
             except Exception as e:
                 bot_response = (
-                    f"⚠️ I tried to run the pandas command but got an error:\n\n"
-                    f"`{e}`\n\nHere's the code I tried:\n```python\n{pandas_code}\n```"
+                    f"⚠️ I encountered an error while processing your request. "
+                    f"Please try rephrasing your question.\n\nError: `{e}`"
                 )
                 st.chat_message("assistant", avatar="🤖").markdown(bot_response)
 
