@@ -40,7 +40,7 @@ if uploaded_file is not None:
         st.error(f"An error occurred while reading the file: {e}")
 
 # --- METADATA FILE UPLOADER ---
-st.subheader("Upload Metadata for Dataset (Optional)")
+st.subheader("Upload Metadata for Dataset")
 metadata_file = st.file_uploader("Choose a Metadata CSV file", type=["csv"], key="metadata_csv")
 
 if metadata_file is not None:
