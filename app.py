@@ -2,84 +2,83 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 
-# Set up the Streamlit app layout
-st.title("🤖 My Chatbot and Data Analysis App")
-st.subheader("Upload your data files below")
-
-# Configure Gemini API Key
+# --- Configure Gemini API Key ---
 key = st.secrets["gemini_api_key"]
 genai.configure(api_key=key)
 model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
-# Initialize session state
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-if "uploaded_data" not in st.session_state:
-    st.session_state.uploaded_data = None
-if "metadata" not in st.session_state:
-    st.session_state.metadata = None
-
-# --- FILE UPLOAD ---
+# --- Initialize Streamlit App ---
+st.title("🤖 Chatbot with Data Analysis")
 st.subheader("Upload Required Files")
 
+# --- Session state initialization ---
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+if "transactions" not in st.session_state:
+    st.session_state.transactions = None
+
+if "data_dict" not in st.session_state:
+    st.session_state.data_dict = None
+
+# --- File uploader ---
 uploaded_files = st.file_uploader(
     "Upload 'transactions.csv' and 'data_dict.csv'",
     type=["csv"],
     accept_multiple_files=True
 )
 
-# Process uploaded files
+# --- File processing logic ---
+required_files = {"transactions.csv": "transactions", "data_dict.csv": "data_dict"}
+
 for uploaded_file in uploaded_files or []:
-    if uploaded_file.name == "transactions.csv":
+    if uploaded_file.name in required_files:
         try:
-            st.session_state.uploaded_data = pd.read_csv(uploaded_file)
-            st.success("✅ transactions.csv loaded successfully.")
-            st.write("### Transactions Preview")
-            st.dataframe(st.session_state.uploaded_data.head())
+            setattr(st.session_state, required_files[uploaded_file.name], pd.read_csv(uploaded_file))
+            st.success(f"✅ {uploaded_file.name} loaded successfully.")
+            st.write(f"### {uploaded_file.name.split('.')[0].title()} Preview")
+            st.dataframe(getattr(st.session_state, required_files[uploaded_file.name]).head())
         except Exception as e:
-            st.error(f"❌ Failed to read transactions.csv: {e}")
-    elif uploaded_file.name == "data_dict.csv":
-        try:
-            st.session_state.metadata = pd.read_csv(uploaded_file)
-            st.success("✅ data_dict.csv (metadata) loaded successfully.")
-            st.write("### Metadata Preview")
-            st.dataframe(st.session_state.metadata.head())
-        except Exception as e:
-            st.error(f"❌ Failed to read data_dict.csv: {e}")
+            st.error(f"❌ Failed to load {uploaded_file.name}: {e}")
     else:
-        st.warning(f"⚠️ Unexpected file: {uploaded_file.name}. Expected 'transactions.csv' or 'data_dict.csv'")
+        st.warning(f"⚠️ Unexpected file '{uploaded_file.name}' uploaded.")
 
-# --- CHECKBOX TO ENABLE ANALYSIS ---
-analyze_data_checkbox = st.checkbox("Analyze CSV Data with AI")
+# --- Checkbox to control AI analysis ---
+analyze_data_checkbox = st.checkbox("Analyze uploaded CSV data with AI", value=True)
 
-# --- CHAT INPUT ---
-if user_input := st.chat_input("Type your message here..."):
+# --- Chat Input and Processing ---
+user_input = st.chat_input("Type your message here...")
+
+if user_input:
     st.session_state.chat_history.append(("user", user_input))
     st.chat_message("user").markdown(user_input)
 
-    if model:
-        try:
-            if st.session_state.uploaded_data is not None:
-                data_description = st.session_state.uploaded_data.describe().to_string()
-                prompt = f"The user says: '{user_input}'\n\nHere is the dataset description:\n{data_description}"
-
-                if st.session_state.metadata is not None:
-                    metadata_description = st.session_state.metadata.to_string()
-                    prompt += f"\n\nMetadata:\n{metadata_description}"
-
-                if not analyze_data_checkbox:
-                    prompt += "\n\nNote: The user has not requested analysis, but this data may help your response."
-
-                response = model.generate_content(prompt)
-                bot_response = response.text
-            else:
-                # No dataset uploaded
-                bot_response = "Please upload 'transactions.csv' to enable analysis or contextual chat."
-
-            st.session_state.chat_history.append(("assistant", bot_response))
-            st.chat_message("assistant").markdown(bot_response)
-
-        except Exception as e:
-            st.error(f"An error occurred while generating the response: {e}")
+    if not model:
+        st.error("❌ Gemini API model is not properly configured.")
     else:
-        st.warning("Please configure the Gemini API Key to enable chat responses.")
+        prompt = f"User: {user_input}\n"
+
+        if analyze_data_checkbox:
+            if st.session_state.transactions is not None:
+                data_summary = st.session_state.transactions.describe(include='all').to_string()
+                prompt += f"\nDataset Summary:\n{data_summary}\n"
+            if st.session_state.data_dict is not None:
+                metadata_info = st.session_state.data_dict.to_string()
+                prompt += f"\nMetadata:\n{metadata_info}\n"
+
+        elif not (st.session_state.transactions and st.session_state.data_dict):
+            prompt += "\nNote: Required data files are not uploaded or fully loaded yet.\n"
+
+        try:
+            response = model.generate_content(prompt)
+            bot_response = response.text
+        except Exception as e:
+            bot_response = f"⚠️ Error generating response: {e}"
+
+        st.session_state.chat_history.append(("assistant", bot_response))
+        st.chat_message("assistant").markdown(bot_response)
+
+# --- Display previous chat history ---
+for role, message in st.session_state.chat_history:
+    with st.chat_message(role):
+        st.markdown(message)
