@@ -192,11 +192,7 @@ if user_input := st.chat_input("พิมพ์คำถามเกี่ยว
 
             bot_response = summarize_as_analyst(answer_text)
 
-            styled_bot_response = f"""
-<div style=\"background-color:#fff9db; padding: 1rem; border-radius: 0.5rem; border: 1px solid #f1e6b8;\">
-{bot_response}
-</div>
-"""
+            styled_bot_response = bot_response
             st.session_state.qa_memory[normalized_question] = styled_bot_response
             st.chat_message("assistant", avatar="🤖").markdown(styled_bot_response, unsafe_allow_html=True)
             st.session_state.chat_history.append(("assistant", styled_bot_response))
